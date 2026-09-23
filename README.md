@@ -25,6 +25,40 @@ If you have any questions, feel free to join my Discord
 
 [Video](https://youtu.be/ReE9nVuMCSE)
 
+## Development
+
+This project is a Rust workspace. To build and run the main application from source:
+
+```bash
+# Build and run in release mode (recommended for performance)
+make run-app
+```
+
+Equivalent commands:
+
+```bash
+# From the workspace root
+cargo run --release --bin neothesia
+
+# Or from the neothesia/ crate directory
+cd neothesia && cargo run --release
+```
+
+### Prerequisites
+
+- [Rust](https://rustup.rs/) (stable toolchain)
+- System audio backend libraries (ALSA/JACK on Linux, CoreAudio on macOS, WASAPI on Windows)
+- For the `fluid-synth` feature: FluidSynth and its dev headers
+
+### Features
+
+By default the `oxi-synth` feature is enabled (uses OxiSynth for MIDI audio). Alternatives:
+
+```bash
+# FluidSynth backend
+cargo run --release --bin neothesia --features fluid-synth
+```
+
 ## Download
 
 <a href="https://flathub.org/apps/details/com.github.polymeilex.neothesia"><img width="240" alt="Download on Flathub" src="https://flathub.org/assets/badges/flathub-badge-en.png"/></a>
