@@ -95,14 +95,14 @@ pub struct OutputManager {
 
 impl Default for OutputManager {
     fn default() -> Self {
-        Self::new()
+        Self::new(256, crate::config::VelocityCurve::Linear)
     }
 }
 
 impl OutputManager {
-    pub fn new() -> Self {
+    pub fn new(polyphony: u16, velocity_curve: crate::config::VelocityCurve) -> Self {
         #[cfg(feature = "synth")]
-        let synth_backend = match SynthBackend::new() {
+        let synth_backend = match SynthBackend::new(polyphony, velocity_curve) {
             Ok(synth_backend) => Some(synth_backend),
             Err(err) => {
                 log::error!("{err:?}");

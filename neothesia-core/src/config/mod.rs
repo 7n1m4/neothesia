@@ -3,12 +3,12 @@ use std::path::PathBuf;
 mod model;
 
 pub use model::ColorSchemaV1;
+pub use model::VelocityCurve;
 use model::{
     AppearanceConfig, AppearanceConfigV1, DevicesConfig, DevicesConfigV1, History, HistoryV1,
     LayoutConfig, LayoutConfigV1, Model, PcKeyboardConfig, PcKeyboardConfigV1, PlaybackConfig,
     PlaybackConfigV1, SynthConfig, SynthConfigV1, WaterfallConfig, WaterfallConfigV1,
 };
-
 fn ron_options() -> ron::Options {
     ron::Options::default()
         .with_default_extension(ron::extensions::Extensions::UNWRAP_VARIANT_NEWTYPES)
@@ -222,6 +222,31 @@ impl Config {
 
     pub fn set_audio_gain(&mut self, gain: f32) {
         self.synth.audio_gain = gain.max(0.0);
+    }
+
+    pub fn polyphony(&self) -> u16 {
+        self.synth.polyphony
+    }
+
+    pub fn set_polyphony(&mut self, polyphony: u16) {
+        self.synth.polyphony = polyphony.max(1);
+    }
+
+    pub fn velocity_curve(&self) -> VelocityCurve {
+        self.synth.velocity_curve
+    }
+
+    pub fn set_velocity_curve(&mut self, curve: VelocityCurve) {
+        self.synth.velocity_curve = curve;
+    }
+
+    pub fn velocity_curve_name(&self) -> &'static str {
+        match self.synth.velocity_curve {
+            VelocityCurve::Linear => "Linear",
+            VelocityCurve::Concave => "Concave",
+            VelocityCurve::Convex => "Convex",
+            VelocityCurve::Fixed => "Fixed",
+        }
     }
 
     pub fn animation_offset(&self) -> f32 {

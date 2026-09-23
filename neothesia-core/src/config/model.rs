@@ -86,12 +86,24 @@ impl Default for History {
         })
     }
 }
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SynthConfigV1 {
     pub soundfont_path: Option<PathBuf>,
     #[serde(default = "default_audio_gain")]
     pub audio_gain: f32,
+    #[serde(default = "default_polyphony")]
+    pub polyphony: u16,
+    #[serde(default = "default_velocity_curve")]
+    pub velocity_curve: VelocityCurve,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Default, PartialEq, Eq, Debug)]
+pub enum VelocityCurve {
+    #[default]
+    Linear,
+    Concave,
+    Convex,
+    Fixed,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -104,6 +116,8 @@ impl Default for SynthConfig {
         Self::V1(SynthConfigV1 {
             soundfont_path: None,
             audio_gain: default_audio_gain(),
+            polyphony: default_polyphony(),
+            velocity_curve: default_velocity_curve(),
         })
     }
 }
@@ -238,6 +252,14 @@ fn default_note_labels() -> bool {
 
 fn default_audio_gain() -> f32 {
     0.2
+}
+
+fn default_velocity_curve() -> VelocityCurve {
+    VelocityCurve::Linear
+}
+
+fn default_polyphony() -> u16 {
+    256
 }
 
 fn default_vertical_guidelines() -> bool {

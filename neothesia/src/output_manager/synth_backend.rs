@@ -15,10 +15,12 @@ pub struct SynthBackend {
     stream_config: cpal::StreamConfig,
     sample_format: cpal::SampleFormat,
     gain: f32,
+    polyphony: u16,
+    velocity_curve: crate::config::VelocityCurve,
 }
 
 impl SynthBackend {
-    pub fn new() -> Result<Self, Box<dyn Error>> {
+    pub fn new(polyphony: u16, velocity_curve: crate::config::VelocityCurve) -> Result<Self, Box<dyn Error>> {
         let host = cpal::default_host();
 
         let device = host
@@ -37,6 +39,8 @@ impl SynthBackend {
             stream_config,
             sample_format,
             gain: 0.2,
+            polyphony,
+            velocity_curve,
         })
     }
 
@@ -46,10 +50,10 @@ impl SynthBackend {
         path: &Path,
     ) -> cpal::Stream {
         #[cfg(all(feature = "fluid-synth", not(feature = "oxi-synth")))]
-        let mut next_value = fluidsynth_adapter(self, rx, path);
+        let mut next_value = fluidsynth_adapter(self, rx, path, self.polyphony);
 
         #[cfg(all(feature = "oxi-synth", not(feature = "fluid-synth")))]
-        let mut next_value = oxisynth_adapter(self, rx, path, self.gain);
+        let mut next_value = oxisynth_adapter(self, rx, path, self.gain, self.polyphony);
 
         let err_fn = |err| eprintln!("an error occurred on stream: {err}");
 
@@ -100,10 +104,7 @@ impl SynthBackend {
             sample_format => unimplemented!("Unsupported sample format '{sample_format}'"),
         };
 
-        SynthOutputConnection {
-            _stream: Rc::new(stream),
-            tx,
-        }
+        SynthOutputConnection::new(Rc::new(stream), tx, self.velocity_curve)
     }
 
     pub fn get_outputs(&self) -> Vec<OutputDescriptor> {
@@ -111,7 +112,7 @@ impl SynthBackend {
     }
 }
 
-enum SynthEvent {
+pub(crate) enum SynthEvent {
     SetGain(f32),
     Midi(oxisynth::MidiEvent),
 }
@@ -120,11 +121,23 @@ enum SynthEvent {
 pub struct SynthOutputConnection {
     _stream: Rc<cpal::Stream>,
     tx: std::sync::mpsc::Sender<SynthEvent>,
+    velocity_curve: crate::config::VelocityCurve,
 }
-
 impl SynthOutputConnection {
+    pub(crate) fn new(stream: Rc<cpal::Stream>, tx: std::sync::mpsc::Sender<SynthEvent>, velocity_curve: crate::config::VelocityCurve) -> Self {
+        Self {
+            _stream: stream,
+            tx,
+            velocity_curve,
+        }
+    }
+
     pub fn midi_event(&self, channel: u4, msg: midly::MidiMessage) {
-        let event = libmidi_to_oxisynth_event(channel, msg);
+        let mut event = libmidi_to_oxisynth_event(channel, msg);
+        // Apply velocity curve to NoteOn events
+        if let oxisynth::MidiEvent::NoteOn { ref mut vel, .. } = event {
+            *vel = apply_velocity_curve(*vel, self.velocity_curve);
+        }
         self.tx.send(SynthEvent::Midi(event)).ok();
     }
 
@@ -187,22 +200,34 @@ fn libmidi_to_oxisynth_event(channel: u4, message: midly::MidiMessage) -> oxisyn
     }
 }
 
+fn apply_velocity_curve(vel: u8, curve: crate::config::VelocityCurve) -> u8 {
+    let v = vel as f32 / 127.0;
+    let curved = match curve {
+        crate::config::VelocityCurve::Linear => v,
+        crate::config::VelocityCurve::Concave => v * v, // Ease in
+        crate::config::VelocityCurve::Convex => 1.0 - (1.0 - v) * (1.0 - v), // Ease out
+        crate::config::VelocityCurve::Fixed => 1.0, // Max velocity
+    };
+    (curved * 127.0).round().clamp(0.0, 127.0) as u8
+}
+
 #[cfg(all(feature = "oxi-synth", not(feature = "fluid-synth")))]
 fn oxisynth_adapter<'a>(
     this: &SynthBackend,
     rx: Receiver<SynthEvent>,
     path: &Path,
     gain: f32,
+    polyphony: u16,
 ) -> impl FnMut() -> (f32, f32) + 'a {
     let sample_rate = this.stream_config.sample_rate as f32;
 
     let mut synth = oxisynth::Synth::new(oxisynth::SynthDescriptor {
         sample_rate,
         gain,
+        polyphony,
         ..Default::default()
     })
     .unwrap();
-
     synth.set_reverb_params(&oxisynth::ReverbParams {
         roomsize: 0.5,
         damp: 0.3,
@@ -246,6 +271,7 @@ fn fluidsynth_adapter<'a>(
     this: &SynthBackend,
     rx: Receiver<SynthEvent>,
     path: &Path,
+    polyphony: u16,
 ) -> impl FnMut() -> (f32, f32) + 'a {
     use fluidlite::{IsSettings, Settings};
 
@@ -256,6 +282,9 @@ fn fluidsynth_adapter<'a>(
 
         let rate = settings.pick::<_, f64>("synth.sample-rate").unwrap();
         rate.set(sample_rate as f64);
+
+        let poly = settings.pick::<_, i32>("synth.polyphony").unwrap();
+        poly.set(polyphony as i32);
 
         let synth = fluidlite::Synth::new(settings).unwrap();
         synth.sfload(path, true).unwrap();

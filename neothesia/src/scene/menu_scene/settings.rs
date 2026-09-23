@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use crate::{
+    config::VelocityCurve,
     context::Context,
     scene::menu_scene::{MsgFn, Popup, icons, neo_btn_icon, on_async},
     utils::BoxFuture,
@@ -336,6 +337,28 @@ impl super::MenuScene {
                     .id("gain")
                     .build(ui, rows),
             );
+
+            spacer(ui);
+
+            self::update_polyphony(
+                ctx,
+                nuon::settings_row_spin()
+                    .title("Polyphony")
+                    .subtitle(ctx.config.polyphony().to_string())
+                    .id("polyphony")
+                    .build(ui, rows),
+            );
+
+            spacer(ui);
+
+            self::update_velocity_curve(
+                ctx,
+                nuon::settings_row_spin()
+                    .title("Velocity Curve")
+                    .subtitle(ctx.config.velocity_curve_name())
+                    .id("velocity_curve")
+                    .build(ui, rows),
+            );
         } else if is_midi {
             spacer(ui);
 
@@ -572,6 +595,48 @@ pub fn update_audio_gain(ctx: &mut Context, kind: nuon::SettingsRowSpinResult) {
 
     ctx.config
         .set_audio_gain((ctx.config.audio_gain() * 10.0).round() / 10.0);
+}
+
+pub fn update_polyphony(ctx: &mut Context, kind: nuon::SettingsRowSpinResult) {
+    match kind {
+        nuon::SettingsRowSpinResult::Plus => {
+            ctx.config.set_polyphony(ctx.config.polyphony().saturating_add(16));
+        }
+        nuon::SettingsRowSpinResult::Minus => {
+            ctx.config.set_polyphony(ctx.config.polyphony().saturating_sub(16));
+        }
+        nuon::SettingsRowSpinResult::Idle => {}
+    }
+
+    ctx.config
+        .set_polyphony((ctx.config.polyphony() / 16) * 16);
+}
+
+pub fn update_velocity_curve(
+    ctx: &mut Context,
+    kind: nuon::SettingsRowSpinResult,
+) {
+    match kind {
+        nuon::SettingsRowSpinResult::Plus => {
+            let curve = match ctx.config.velocity_curve() {
+                VelocityCurve::Linear => VelocityCurve::Concave,
+                VelocityCurve::Concave => VelocityCurve::Convex,
+                VelocityCurve::Convex => VelocityCurve::Fixed,
+                VelocityCurve::Fixed => VelocityCurve::Linear,
+            };
+            ctx.config.set_velocity_curve(curve);
+        }
+        nuon::SettingsRowSpinResult::Minus => {
+            let curve = match ctx.config.velocity_curve() {
+                VelocityCurve::Linear => VelocityCurve::Fixed,
+                VelocityCurve::Concave => VelocityCurve::Linear,
+                VelocityCurve::Convex => VelocityCurve::Concave,
+                VelocityCurve::Fixed => VelocityCurve::Convex,
+            };
+            ctx.config.set_velocity_curve(curve);
+        }
+        nuon::SettingsRowSpinResult::Idle => {}
+    }
 }
 
 const MIN_RANGE_LEN: u8 = 24;

@@ -66,7 +66,7 @@ impl Context {
             text_renderer_factory,
             quad_renderer_factory,
 
-            output_manager: Default::default(),
+            output_manager: OutputManager::new(config.polyphony(), config.velocity_curve()),
             input_manager: InputManager::new(proxy.clone()),
             config,
             proxy,
