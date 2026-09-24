@@ -501,9 +501,11 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
                     ("Sound Effects", icons::effects_icon, (120..=127).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
                 ];
                 scene.instrument_scroll = nuon::scroll()
-                    .scissor_size(panel_w, content_h)
+                    .scissor_size(panel_w, panel_h)
                     .scroll(scene.instrument_scroll)
                     .build(ui, |ui| {
+                        // Offset content to start below title bar
+                        nuon::translate().y(content_y).add_to_current(ui);
 
                         for (col_idx, group_chunk) in groups.chunks(3).enumerate() {
                             let col_x = 24.0 + col_idx as f32 * (col_w + col_gap);
