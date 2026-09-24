@@ -65,41 +65,53 @@ pub fn music_icon() -> &'static str {
 }
 
 pub fn piano_icon() -> &'static str {
-    "\u{F5E1}"
+    "\u{F451}"
 }
 
 pub fn organ_icon() -> &'static str {
-    "\u{F5E1}"
+    "\u{F4A2}"
 }
 
 pub fn guitar_icon() -> &'static str {
-    "\u{F5E1}"
+    "\u{F4A0}"
+}
+
+pub fn bass_icon() -> &'static str {
+    "\u{F57C}"
+}
+
+pub fn chromatic_icon() -> &'static str {
+    "\u{F49F}"
 }
 
 pub fn strings_icon() -> &'static str {
-    "\u{F5E1}"
+    "\u{F49E}"
 }
 
 pub fn brass_icon() -> &'static str {
-    "\u{F5E1}"
+    "\u{F490}"
 }
 
 pub fn woodwind_icon() -> &'static str {
-    "\u{F5E1}"
+    "\u{F2D4}"
 }
 
-pub fn synth_icon() -> &'static str {
-    "\u{F5E1}"
+pub fn synth_lead_icon() -> &'static str {
+    "\u{F608}"
+}
+
+pub fn synth_pad_icon() -> &'static str {
+    "\u{F2FF}"
 }
 
 pub fn ethnic_icon() -> &'static str {
-    "\u{F5E1}"
+    "\u{F3EE}"
 }
 
 pub fn percussion_icon() -> &'static str {
-    "\u{F5E1}"
+    "\u{F519}"
 }
 
 pub fn effects_icon() -> &'static str {
-    "\u{F5E1}"
+    "\u{F588}"
 }

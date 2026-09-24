@@ -65,7 +65,6 @@ pub struct FreeplayScene {
 
     // UI state
     popup: FreeplayPopup,
-    instrument_selector_scroll: nuon::ScrollState,
 }
 
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
@@ -133,7 +132,6 @@ impl FreeplayScene {
             current_programs: [0; 16],
 
             popup: FreeplayPopup::default(),
-            instrument_selector_scroll: nuon::ScrollState::default(),
         }
     }
 

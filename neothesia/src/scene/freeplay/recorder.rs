@@ -284,7 +284,7 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
     let top_bar_height = 30.0;
 
     let width = ctx.window_state.logical_size.width;
-
+    let height = ctx.window_state.logical_size.height;
     let available = scene.preview.is_some();
 
     let is_paused = scene
@@ -416,113 +416,156 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
             }
 
             if scene.popup == FreeplayPopup::InstrumentSelector {
+                // Fullscreen overlay
+                let win_w = width;
+                let win_h = height;
+                let margin = 40.0;
+                let panel_w = win_w - margin * 2.0;
+                let panel_h = win_h - margin * 2.0;
+                let panel_x = margin;
+                let panel_y = margin;
+
                 nuon::layer().overlay(true).build(ui, |ui| {
-                    nuon::translate()
-                        .x(-150.0)
-                        .y(35.0)
-                        .add_to_current(ui);
-
-                    let item_h = 26.0;
-                    let item_w = 200.0;
-                    let header_h = 28.0;
-                    let max_visible = 12;
-
-                    // Categorized instrument groups
-                    let groups: Vec<(&str, Vec<(u8, &str)>)> = vec![
-                        ("Piano", (0..=8).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
-                        ("Organ", (16..=23).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
-                        ("Guitar", (32..=44).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
-                        ("Bass", (45..=52).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
-                        ("Strings", (53..=68).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
-                        ("Brass", (69..=76).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
-                        ("Woodwind", (77..=92).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
-                        ("Synth Lead", (93..=100).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
-                        ("Synth Pad", (101..=108).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
-                        ("Ethnic", (109..=124).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
-                        ("Percussion", (125..=132).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
-                        ("Effects", (133..=140).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
-                    ];
-
-                    let total_items: usize = groups.iter().map(|(_, items)| 1 + items.len()).sum();
-                    let visible_h = item_h * max_visible.min(total_items) as f32 + header_h;
-
-                    // Background
+                    // Dark backdrop
                     nuon::quad()
-                        .width(item_w)
-                        .height(visible_h)
-                        .color([27, 25, 32])
+                        .size(win_w, win_h)
+                        .color([0, 0, 0, 200])
                         .build(ui);
 
-                    // Scrollable layer
-                    scene.instrument_selector_scroll = nuon::scroll()
-                        .scissor_rect(nuon::Rect {
-                            origin: nuon::Point::zero(),
-                            size: nuon::Size::new(item_w, visible_h),
-                        })
-                        .scroll(scene.instrument_selector_scroll)
-                        .build(ui, |ui| {
-                            let mut y = 0.0;
+                    // Panel background
+                    nuon::translate()
+                        .x(panel_x)
+                        .y(panel_y)
+                        .add_to_current(ui);
 
-                            for (group_name, instruments) in &groups {
-                                // Group header
-                                nuon::quad()
-                                    .y(y)
-                                    .size(item_w, header_h)
-                                    .color([45, 43, 50])
-                                    .build(ui);
+                    nuon::quad()
+                        .size(panel_w, panel_h)
+                        .color([27, 25, 32])
+                        .border_radius([12.0; 4])
+                        .build(ui);
 
-                                nuon::label()
-                                    .y(y + 2.0)
-                                    .x(8.0)
-                                    .size(item_w - 16.0, header_h - 4.0)
-                                    .text(group_name.to_string())
-                                    .color([180, 180, 185])
-                                    .font_size(13.0)
-                                    .build(ui);
+                    // Title bar
+                    nuon::label()
+                        .y(16.0)
+                        .x(24.0)
+                        .size(panel_w - 48.0, 36.0)
+                        .text("Select Instrument".to_string())
+                        .font_size(24.0)
+                        .color([255, 255, 255])
+                        .text_justify(nuon::TextJustify::Left)
+                        .build(ui);
 
-                                y += header_h;
-
-                                for (program, name) in instruments {
-                                    let is_selected = scene.current_programs[0] == *program;
-
-                                    let item_id = nuon::Id::hash_with(|h| {
-                                        use std::hash::Hash;
-                                        "instrument_item_".hash(h);
-                                        program.hash(h);
-                                    });
-
-                                    if nuon::button()
-                                        .id(item_id)
-                                        .y(y)
-                                        .size(item_w, item_h)
-                                        .label((*name).to_string())
-                                        .text_justify(nuon::TextJustify::Left)
-                                        .border_radius([4.0; 4])
-                                        .color(if is_selected {
-                                            [100, 70, 180]
-                                        } else {
-                                            [37, 35, 42]
-                                        })
-                                        .hover_color([160, 81, 255])
-                                        .preseed_color([180, 90, 255])
-                                        .build(ui)
-                                    {
-                                        scene.current_programs[0] = *program;
-                                        ctx.output_manager
-                                            .connection()
-                                            .midi_event(
-                                                u4::new(0),
-                                                MidiMessage::ProgramChange {
-                                                    program: u7::new(*program),
-                                                },
-                                            );
-                                        scene.popup.close();
-                                    }
-
-                                    y += item_h;
-                                }
-                            }
+                    // Close button (X)
+                    nuon::button()
+                        .y(12.0)
+                        .x(panel_w - 48.0)
+                        .size(36.0, 36.0)
+                        .border_radius([6.0; 4])
+                        .color([50, 48, 55])
+                        .hover_color([80, 78, 85])
+                        .label("×".to_string())
+                        .build(ui)
+                        .then(|| {
+                            scene.popup.close();
                         });
+                    let content_y = 64.0;
+                    let _content_h = panel_h - content_y - 16.0;
+                    let col_count = 4;
+                    let col_gap = 12.0;
+                    let col_w = (panel_w - 48.0 - (col_gap * (col_count as f32 - 1.0))) / col_count as f32;
+
+                    let groups: Vec<(&str, fn() -> &'static str, Vec<(u8, &str)>)> = vec![
+                        ("Piano", icons::piano_icon, (0..=7).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Chromatic", icons::chromatic_icon, (8..=15).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Organ", icons::organ_icon, (16..=23).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Guitar", icons::guitar_icon, (24..=31).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Bass", icons::bass_icon, (32..=39).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Strings", icons::strings_icon, (40..=47).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Ensemble", icons::strings_icon, (48..=55).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Brass", icons::brass_icon, (56..=63).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Reed", icons::woodwind_icon, (64..=71).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Pipe", icons::woodwind_icon, (72..=79).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Synth Lead", icons::synth_lead_icon, (80..=87).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Synth Pad", icons::synth_pad_icon, (88..=95).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Synth Effects", icons::effects_icon, (96..=103).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Ethnic", icons::ethnic_icon, (104..=111).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Percussive", icons::percussion_icon, (112..=119).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Sound Effects", icons::effects_icon, (120..=127).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                    ];
+
+                    for (col_idx, group_chunk) in groups.chunks(3).enumerate() {
+                        let col_x = 24.0 + col_idx as f32 * (col_w + col_gap);
+
+                        let mut gy = content_y;
+
+                        for (group_name, icon_fn, instruments) in group_chunk {
+                            // Group header background
+                            nuon::quad()
+                                .x(col_x)
+                                .y(gy)
+                                .size(col_w, 22.0)
+                                .color([45, 43, 50])
+                                .border_radius([4.0; 4])
+                                .build(ui);
+
+                            // Group header icon + text
+                            nuon::label()
+                                .x(col_x + 8.0)
+                                .y(gy + 2.0)
+                                .size(col_w - 16.0, 18.0)
+                                .text(format!("{}  {}", icon_fn(), group_name))
+                                .color([180, 180, 185])
+                                .font_size(12.0)
+                                .text_justify(nuon::TextJustify::Left)
+                                .build(ui);
+
+                            gy += 26.0;
+
+
+                            for (program, name) in instruments {
+                                let is_selected = scene.current_programs[0] == *program;
+
+                                let item_id = nuon::Id::hash_with(|h| {
+                                    use std::hash::Hash;
+                                    "instrument_item_".hash(h);
+                                    program.hash(h);
+                                });
+
+                                if nuon::button()
+                                    .id(item_id)
+                                    .x(col_x)
+                                    .y(gy)
+                                    .size(col_w, 20.0)
+                                    .label((*name).to_string())
+                                    .text_justify(nuon::TextJustify::Left)
+                                    .border_radius([3.0; 4])
+                                    .color(if is_selected {
+                                        [100, 70, 180]
+                                    } else {
+                                        [37, 35, 42]
+                                    })
+                                    .hover_color([160, 81, 255])
+                                    .preseed_color([180, 90, 255])
+                                    .build(ui)
+                                {
+                                    scene.current_programs[0] = *program;
+                                    ctx.output_manager
+                                        .connection()
+                                        .midi_event(
+                                            u4::new(0),
+                                            MidiMessage::ProgramChange {
+                                                program: u7::new(*program),
+                                            },
+                                        );
+                                    scene.popup.close();
+                                }
+
+                                gy += 22.0;
+                            }
+
+                            gy += 8.0;
+                        }
+                    }
 
                 });
             }
