@@ -376,6 +376,9 @@ impl super::MenuScene {
             // Pocket Teto config options
             let config = ctx.config.pocket_teto_config();
             let samples_dir = config.samples_dir.display().to_string();
+            let base_note = config.base_note;
+            let max_pitch = config.max_pitch_ratio;
+            let min_pitch = config.min_pitch_ratio;
 
             nuon::settings_row()
                 .title("Samples Directory")
@@ -385,35 +388,44 @@ impl super::MenuScene {
                         .label("Select Folder")
                         .build(ui)
                     {
-                        // TODO: Add folder picker
-                        log::info!("Pocket Teto samples folder picker not yet implemented");
+                        self.futures
+                            .push(self::open_pocket_teto_folder_picker(&mut self.state));
                     }
                 })
                 .build(ui, rows);
 
             spacer(ui);
 
-            nuon::settings_row_spin()
-                .title("Base Note (A4=69)")
-                .subtitle(config.base_note.to_string())
-                .id("pocket_teto_base_note")
-                .build(ui, rows);
+            self::update_pocket_teto_base_note(
+                ctx,
+                nuon::settings_row_spin()
+                    .title("Base Note (A4=69)")
+                    .subtitle(base_note.to_string())
+                    .id("pocket_teto_base_note")
+                    .build(ui, rows),
+            );
 
             spacer(ui);
 
-            nuon::settings_row_spin()
-                .title("Max Pitch Ratio")
-                .subtitle(format!("{:.2}", config.max_pitch_ratio))
-                .id("pocket_teto_max_pitch")
-                .build(ui, rows);
+            self::update_pocket_teto_max_pitch(
+                ctx,
+                nuon::settings_row_spin()
+                    .title("Max Pitch Ratio")
+                    .subtitle(format!("{:.2}", max_pitch))
+                    .id("pocket_teto_max_pitch")
+                    .build(ui, rows),
+            );
 
             spacer(ui);
 
-            nuon::settings_row_spin()
-                .title("Min Pitch Ratio")
-                .subtitle(format!("{:.2}", config.min_pitch_ratio))
-                .id("pocket_teto_min_pitch")
-                .build(ui, rows);
+            self::update_pocket_teto_min_pitch(
+                ctx,
+                nuon::settings_row_spin()
+                    .title("Min Pitch Ratio")
+                    .subtitle(format!("{:.2}", min_pitch))
+                    .id("pocket_teto_min_pitch")
+                    .build(ui, rows),
+            );
         } else if is_midi {
             spacer(ui);
 
@@ -767,4 +779,63 @@ async fn open_sondfont_picker_fut() -> Option<PathBuf> {
     }
 
     file.map(|f| f.path().to_owned())
+}
+pub fn open_pocket_teto_folder_picker(data: &mut UiState) -> BoxFuture<MsgFn> {
+    data.is_loading = true;
+    on_async(open_pocket_teto_folder_picker_fut(), |res, data, ctx| {
+        if let Some(folder) = res {
+            ctx.config.set_pocket_teto_samples_dir(folder.clone());
+            log::info!("Pocket Teto samples directory set to: {:?}", folder);
+        }
+        data.is_loading = false;
+    })
+}
+
+async fn open_pocket_teto_folder_picker_fut() -> Option<PathBuf> {
+    let folder = rfd::AsyncFileDialog::new()
+        .pick_folder()
+        .await;
+
+    if let Some(folder) = folder.as_ref() {
+        log::info!("Pocket Teto samples folder path = {:?}", folder.path());
+    } else {
+        log::info!("User canceled folder dialog");
+    }
+
+    folder.map(|f| f.path().to_owned())
+}
+pub fn update_pocket_teto_base_note(ctx: &mut Context, kind: nuon::SettingsRowSpinResult) {
+    match kind {
+        nuon::SettingsRowSpinResult::Plus => {
+            ctx.config.set_pocket_teto_base_note(ctx.config.pocket_teto_config().base_note.saturating_add(1));
+        }
+        nuon::SettingsRowSpinResult::Minus => {
+            ctx.config.set_pocket_teto_base_note(ctx.config.pocket_teto_config().base_note.saturating_sub(1));
+        }
+        nuon::SettingsRowSpinResult::Idle => {}
+    }
+}
+
+pub fn update_pocket_teto_max_pitch(ctx: &mut Context, kind: nuon::SettingsRowSpinResult) {
+    match kind {
+        nuon::SettingsRowSpinResult::Plus => {
+            ctx.config.set_pocket_teto_max_pitch(ctx.config.pocket_teto_config().max_pitch_ratio + 0.1);
+        }
+        nuon::SettingsRowSpinResult::Minus => {
+            ctx.config.set_pocket_teto_max_pitch(ctx.config.pocket_teto_config().max_pitch_ratio - 0.1);
+        }
+        nuon::SettingsRowSpinResult::Idle => {}
+    }
+}
+
+pub fn update_pocket_teto_min_pitch(ctx: &mut Context, kind: nuon::SettingsRowSpinResult) {
+    match kind {
+        nuon::SettingsRowSpinResult::Plus => {
+            ctx.config.set_pocket_teto_min_pitch(ctx.config.pocket_teto_config().min_pitch_ratio + 0.1);
+        }
+        nuon::SettingsRowSpinResult::Minus => {
+            ctx.config.set_pocket_teto_min_pitch(ctx.config.pocket_teto_config().min_pitch_ratio - 0.1);
+        }
+        nuon::SettingsRowSpinResult::Idle => {}
+    }
 }
