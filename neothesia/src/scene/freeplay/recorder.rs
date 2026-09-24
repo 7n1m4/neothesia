@@ -419,20 +419,26 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
                 // Fullscreen overlay
                 let win_w = width;
                 let win_h = height;
+                
+                // Calculate panel size - leave margins but clamp to reasonable max
                 let margin = 40.0;
-                let panel_w = win_w - margin * 2.0;
-                let panel_h = win_h - margin * 2.0;
-                let panel_x = margin;
-                let panel_y = margin;
+                let max_panel_w = 1200.0; // Max content width
+                let max_panel_h = 900.0;  // Max content height
+                let panel_w = (win_w - margin * 2.0).min(max_panel_w);
+                let panel_h = (win_h - margin * 2.0).min(max_panel_h);
+                
+                // Center the panel
+                let panel_x = (win_w - panel_w) * 0.5;
+                let panel_y = (win_h - panel_h) * 0.5;
 
                 nuon::layer().overlay(true).build(ui, |ui| {
-                    // Dark backdrop
+                    // Dark backdrop - cover full window
                     nuon::quad()
                         .size(win_w, win_h)
                         .color([0, 0, 0, 200])
                         .build(ui);
 
-                    // Panel background
+                    // Panel background - centered
                     nuon::translate()
                         .x(panel_x)
                         .y(panel_y)
