@@ -10,7 +10,7 @@ use midi_file::midly::{
 };
 use midi_file::midly::num::{u4, u7};
 use neothesia_core::render::{NoteLabels, WaterfallRenderer};
-use std::hash::Hash;
+
 
 use crate::{
     NeothesiaEvent,
@@ -426,23 +426,10 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
                         .iter()
                         .map(|&name| name.to_string())
                         .collect();
-
                     let item_h = 30.0;
                     let item_w = 200.0;
                     let max_visible = 12;
                     let visible_h = item_h * max_visible.min(instruments.len()) as f32;
-                    let full_h = item_h * instruments.len() as f32;
-
-                    // Initialize scroll state if needed
-                    if matches!(scene.instrument_selector_scroll, nuon::ScrollState::Uninitialized) {
-                        scene.instrument_selector_scroll = nuon::ScrollState::Ready {
-                            value: 0.0,
-                            max: 0.0,
-                            mouse_drag_offset: 0.0,
-                        };
-                    }
-
-                    let mut scroll_state = scene.instrument_selector_scroll;
 
                     // Background
                     nuon::quad()
@@ -451,17 +438,14 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
                         .color([27, 25, 32])
                         .build(ui);
 
-                    // Scrollable layer
-                    nuon::layer().scissor_rect(nuon::Rect {
-                        origin: nuon::Point::zero(),
-                        size: nuon::Size::new(item_w, visible_h),
-                    }).build(ui, |ui| {
-                        // Get scroll value - use match to access private field
-                        let scroll = match scroll_state {
-                            nuon::ScrollState::Ready { value, .. } => value,
-                            _ => 0.0,
-                        };
-                        nuon::translate().y(-scroll).build(ui, |ui| {
+                    // Scrollable layer using nuon::scroll()
+                    scene.instrument_selector_scroll = nuon::scroll()
+                        .scissor_rect(nuon::Rect {
+                            origin: nuon::Point::zero(),
+                            size: nuon::Size::new(item_w, visible_h),
+                        })
+                        .scroll(scene.instrument_selector_scroll)
+                        .build(ui, |ui| {
                             for (nth, instrument) in instruments.iter().enumerate() {
                                 let item_id = nuon::Id::hash_with(|h| {
                                     use std::hash::Hash;
@@ -498,31 +482,6 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
                             }
                         });
 
-                        let max_scroll = (full_h - visible_h).max(0.0);
-                        // Update max
-                        match &mut scroll_state {
-                            nuon::ScrollState::Ready { max, .. } => *max = max_scroll,
-                            _ => {}
-                        }
-
-                        // Handle scroll area for wheel events
-                        let scroll_area = nuon::scroll_area()
-                            .rect(nuon::Rect {
-                                origin: nuon::Point::zero(),
-                                size: nuon::Size::new(item_w, visible_h),
-                            })
-                            .build(ui);
-                        // Update scroll state
-                        let delta = -scroll_area;
-                        match &mut scroll_state {
-                            nuon::ScrollState::Ready { value, max, .. } => {
-                                *value = (*value + delta).clamp(0.0, *max);
-                            }
-                            _ => {}
-                        }
-                    });
-
-                    scene.instrument_selector_scroll = scroll_state;
                 });
             }
         });

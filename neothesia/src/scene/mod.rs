@@ -241,6 +241,15 @@ impl NuonRenderer {
 }
 
 fn handle_nuon_window_event(nuon: &mut nuon::Ui, event: &WindowEvent, ctx: &Context) {
+    if let WindowEvent::MouseWheel { delta, .. } = event {
+        let y = match delta {
+            winit::event::MouseScrollDelta::LineDelta(_, y) => y * 60.0,
+            winit::event::MouseScrollDelta::PixelDelta(position) => position.y as f32,
+        };
+
+        nuon.mouse_wheel(y);
+    }
+
     if event.cursor_moved() {
         nuon.mouse_move(
             ctx.window_state.cursor_logical_position.x,
@@ -252,7 +261,6 @@ fn handle_nuon_window_event(nuon: &mut nuon::Ui, event: &WindowEvent, ctx: &Cont
         nuon.mouse_up();
     }
 }
-
 fn render_nuon(ui: &mut nuon::Ui, nuon_renderer: &mut NuonRenderer, ctx: &mut Context) {
     nuon_renderer.ensure_layers(ctx, ui.layers.len());
 
