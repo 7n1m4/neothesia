@@ -415,7 +415,6 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
                 msg = Msg::OpenInstrumentSelector;
             }
         });
-
         if scene.popup == FreeplayPopup::InstrumentSelector {
             // Fullscreen overlay
             let win_w = width;
@@ -475,8 +474,10 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
                     .then(|| {
                         scene.popup.close();
                     });
+
+                // Scrollable content area
                 let content_y = 64.0;
-                let _content_h = panel_h - content_y - 16.0;
+                let content_h = panel_h - content_y - 16.0;
                 let col_count = 4;
                 let col_gap = 12.0;
                 let col_w = (panel_w - 48.0 - (col_gap * (col_count as f32 - 1.0))) / col_count as f32;
@@ -499,80 +500,85 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
                     ("Percussive", icons::percussion_icon, (112..=119).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
                     ("Sound Effects", icons::effects_icon, (120..=127).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
                 ];
+                scene.instrument_scroll = nuon::scroll()
+                    .scissor_size(panel_w, content_h)
+                    .scroll(scene.instrument_scroll)
+                    .build(ui, |ui| {
 
-                for (col_idx, group_chunk) in groups.chunks(3).enumerate() {
-                    let col_x = 24.0 + col_idx as f32 * (col_w + col_gap);
+                        for (col_idx, group_chunk) in groups.chunks(3).enumerate() {
+                            let col_x = 24.0 + col_idx as f32 * (col_w + col_gap);
 
-                    let mut gy = content_y;
+                            let mut gy = 0.0;
 
-                    for (group_name, icon_fn, instruments) in group_chunk {
-                        // Group header background
-                        nuon::quad()
-                            .x(col_x)
-                            .y(gy)
-                            .size(col_w, 22.0)
-                            .color([45, 43, 50])
-                            .border_radius([4.0; 4])
-                            .build(ui);
+                            for (group_name, icon_fn, instruments) in group_chunk {
+                                // Group header background
+                                nuon::quad()
+                                    .x(col_x)
+                                    .y(gy)
+                                    .size(col_w, 22.0)
+                                    .color([45, 43, 50])
+                                    .border_radius([4.0; 4])
+                                    .build(ui);
 
-                        // Group header icon + text
-                        nuon::label()
-                            .x(col_x + 8.0)
-                            .y(gy + 2.0)
-                            .size(col_w - 16.0, 18.0)
-                            .text(format!("{}  {}", icon_fn(), group_name))
-                            .color([180, 180, 185])
-                            .font_size(12.0)
-                            .text_justify(nuon::TextJustify::Left)
-                            .build(ui);
+                                // Group header icon + text
+                                nuon::label()
+                                    .x(col_x + 8.0)
+                                    .y(gy + 2.0)
+                                    .size(col_w - 16.0, 18.0)
+                                    .text(format!("{}  {}", icon_fn(), group_name))
+                                    .color([180, 180, 185])
+                                    .font_size(12.0)
+                                    .text_justify(nuon::TextJustify::Left)
+                                    .build(ui);
 
-                        gy += 26.0;
+                                gy += 26.0;
 
 
-                        for (program, name) in instruments {
-                            let is_selected = scene.current_programs[0] == *program;
+                                for (program, name) in instruments {
+                                    let is_selected = scene.current_programs[0] == *program;
 
-                            let item_id = nuon::Id::hash_with(|h| {
-                                use std::hash::Hash;
-                                "instrument_item_".hash(h);
-                                program.hash(h);
-                            });
+                                    let item_id = nuon::Id::hash_with(|h| {
+                                        use std::hash::Hash;
+                                        "instrument_item_".hash(h);
+                                        program.hash(h);
+                                    });
 
-                            if nuon::button()
-                                .id(item_id)
-                                .x(col_x)
-                                .y(gy)
-                                .size(col_w, 20.0)
-                                .label((*name).to_string())
-                                .text_justify(nuon::TextJustify::Left)
-                                .border_radius([3.0; 4])
-                                .color(if is_selected {
-                                    [100, 70, 180]
-                                } else {
-                                    [37, 35, 42]
-                                })
-                                .hover_color([160, 81, 255])
-                                .preseed_color([180, 90, 255])
-                                .build(ui)
-                            {
-                                scene.current_programs[0] = *program;
-                                ctx.output_manager
-                                    .connection()
-                                    .midi_event(
-                                        u4::new(0),
-                                        MidiMessage::ProgramChange {
-                                            program: u7::new(*program),
-                                        },
-                                    );
-                                scene.popup.close();
+                                    if nuon::button()
+                                        .id(item_id)
+                                        .x(col_x)
+                                        .y(gy)
+                                        .size(col_w, 20.0)
+                                        .label((*name).to_string())
+                                        .text_justify(nuon::TextJustify::Left)
+                                        .border_radius([3.0; 4])
+                                        .color(if is_selected {
+                                            [100, 70, 180]
+                                        } else {
+                                            [37, 35, 42]
+                                        })
+                                        .hover_color([160, 81, 255])
+                                        .preseed_color([180, 90, 255])
+                                        .build(ui)
+                                    {
+                                        scene.current_programs[0] = *program;
+                                        ctx.output_manager
+                                            .connection()
+                                            .midi_event(
+                                                u4::new(0),
+                                                MidiMessage::ProgramChange {
+                                                    program: u7::new(*program),
+                                                },
+                                            );
+                                        scene.popup.close();
+                                    }
+
+                                    gy += 22.0;
+                                }
+
+                                gy += 8.0;
                             }
-
-                            gy += 22.0;
                         }
-
-                        gy += 8.0;
-                    }
-                }
+                    });
 
             });
         }
