@@ -65,6 +65,8 @@ puffin_http = "0.17"
 cosmic-text = "0.19"
 png = "0.18"
 midly = "0.5"
+rodio = { version = "0.22" }
+encoding_rs = "0.8"
 
 # neothesia-cli deps
 ffmpeg = { package = "ffmpeg-sys-next", version = "8", default-features = false }

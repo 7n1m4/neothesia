@@ -296,12 +296,12 @@ impl super::MenuScene {
             .body(|ui, row_w, row_h| self.settings_output_picker(ui, ctx, row_w, row_h))
             .build(ui, rows);
 
-        let (is_synth, is_midi) = self
+        let (is_synth, is_midi, is_pocket_teto) = self
             .state
             .selected_output
             .as_ref()
-            .map(|o| (o.is_synth(), o.is_midi()))
-            .unwrap_or((false, false));
+            .map(|o| (o.is_synth(), o.is_midi(), o.is_pocket_teto()))
+            .unwrap_or((false, false, false));
 
         if is_synth {
             spacer(ui);
@@ -359,6 +359,61 @@ impl super::MenuScene {
                     .id("velocity_curve")
                     .build(ui, rows),
             );
+        } else if is_pocket_teto {
+            spacer(ui);
+
+            if nuon::settings_row_toggler()
+                .title("Pocket Teto Mode")
+                .subtitle("Play Japanese syllables in round-robin")
+                .value(true)
+                .build(ui, rows)
+            {
+                // Could add config options here later
+            }
+
+            spacer(ui);
+
+            // Pocket Teto config options
+            let config = ctx.config.pocket_teto_config();
+            let samples_dir = config.samples_dir.display().to_string();
+
+            nuon::settings_row()
+                .title("Samples Directory")
+                .subtitle(&samples_dir)
+                .body(|ui, row_w, row_h| {
+                    if setting_row_button(row_w, row_h)
+                        .label("Select Folder")
+                        .build(ui)
+                    {
+                        // TODO: Add folder picker
+                        log::info!("Pocket Teto samples folder picker not yet implemented");
+                    }
+                })
+                .build(ui, rows);
+
+            spacer(ui);
+
+            nuon::settings_row_spin()
+                .title("Base Note (A4=69)")
+                .subtitle(config.base_note.to_string())
+                .id("pocket_teto_base_note")
+                .build(ui, rows);
+
+            spacer(ui);
+
+            nuon::settings_row_spin()
+                .title("Max Pitch Ratio")
+                .subtitle(format!("{:.2}", config.max_pitch_ratio))
+                .id("pocket_teto_max_pitch")
+                .build(ui, rows);
+
+            spacer(ui);
+
+            nuon::settings_row_spin()
+                .title("Min Pitch Ratio")
+                .subtitle(format!("{:.2}", config.min_pitch_ratio))
+                .id("pocket_teto_min_pitch")
+                .build(ui, rows);
         } else if is_midi {
             spacer(ui);
 

@@ -63,3 +63,43 @@ pub fn save_icon() -> &'static str {
 pub fn music_icon() -> &'static str {
     "\u{F4A0}"
 }
+
+pub fn piano_icon() -> &'static str {
+    "\u{F5E1}"
+}
+
+pub fn organ_icon() -> &'static str {
+    "\u{F5E1}"
+}
+
+pub fn guitar_icon() -> &'static str {
+    "\u{F5E1}"
+}
+
+pub fn strings_icon() -> &'static str {
+    "\u{F5E1}"
+}
+
+pub fn brass_icon() -> &'static str {
+    "\u{F5E1}"
+}
+
+pub fn woodwind_icon() -> &'static str {
+    "\u{F5E1}"
+}
+
+pub fn synth_icon() -> &'static str {
+    "\u{F5E1}"
+}
+
+pub fn ethnic_icon() -> &'static str {
+    "\u{F5E1}"
+}
+
+pub fn percussion_icon() -> &'static str {
+    "\u{F5E1}"
+}
+
+pub fn effects_icon() -> &'static str {
+    "\u{F5E1}"
+}

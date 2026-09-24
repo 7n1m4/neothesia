@@ -50,7 +50,7 @@ impl Keyboard {
         Self {
             renderer,
             song_config,
-            pressed_by_user_colors: ColorSchemaV1 { base, dark },
+            pressed_by_user_colors: ColorSchemaV1 { name: "Keyboard".into(), base, dark },
         }
     }
 

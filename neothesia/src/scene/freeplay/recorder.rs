@@ -422,14 +422,29 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
                         .y(35.0)
                         .add_to_current(ui);
 
-                    let instruments: Vec<String> = midi_file::INSTRUMENT_NAMES
-                        .iter()
-                        .map(|&name| name.to_string())
-                        .collect();
-                    let item_h = 30.0;
+                    let item_h = 26.0;
                     let item_w = 200.0;
+                    let header_h = 28.0;
                     let max_visible = 12;
-                    let visible_h = item_h * max_visible.min(instruments.len()) as f32;
+
+                    // Categorized instrument groups
+                    let groups: Vec<(&str, Vec<(u8, &str)>)> = vec![
+                        ("Piano", (0..=8).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Organ", (16..=23).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Guitar", (32..=44).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Bass", (45..=52).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Strings", (53..=68).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Brass", (69..=76).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Woodwind", (77..=92).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Synth Lead", (93..=100).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Synth Pad", (101..=108).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Ethnic", (109..=124).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Percussion", (125..=132).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                        ("Effects", (133..=140).map(|i| (i, midi_file::INSTRUMENT_NAMES[i as usize])).collect()),
+                    ];
+
+                    let total_items: usize = groups.iter().map(|(_, items)| 1 + items.len()).sum();
+                    let visible_h = item_h * max_visible.min(total_items) as f32 + header_h;
 
                     // Background
                     nuon::quad()
@@ -438,7 +453,7 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
                         .color([27, 25, 32])
                         .build(ui);
 
-                    // Scrollable layer using nuon::scroll()
+                    // Scrollable layer
                     scene.instrument_selector_scroll = nuon::scroll()
                         .scissor_rect(nuon::Rect {
                             origin: nuon::Point::zero(),
@@ -446,38 +461,65 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
                         })
                         .scroll(scene.instrument_selector_scroll)
                         .build(ui, |ui| {
-                            for (nth, instrument) in instruments.iter().enumerate() {
-                                let item_id = nuon::Id::hash_with(|h| {
-                                    use std::hash::Hash;
-                                    "instrument_selector_".hash(h);
-                                    nth.hash(h);
-                                });
+                            let mut y = 0.0;
 
-                                if nuon::button()
-                                    .id(item_id)
-                                    .y(item_h * nth as f32)
-                                    .size(item_w, item_h)
-                                    .label(instrument.clone())
-                                    .text_justify(nuon::TextJustify::Left)
-                                    .border_radius([5.0; 4])
-                                    .hover_color([160, 81, 255])
-                                    .preseed_color([180, 90, 255])
-                                    .build(ui)
-                                {
-                                    let program = nth as u8;
-                                    scene.current_programs[0] = program;
+                            for (group_name, instruments) in &groups {
+                                // Group header
+                                nuon::quad()
+                                    .y(y)
+                                    .size(item_w, header_h)
+                                    .color([45, 43, 50])
+                                    .build(ui);
 
-                                    // Send program change to output
-                                    ctx.output_manager
-                                        .connection()
-                                        .midi_event(
-                                            u4::new(0),
-                                            MidiMessage::ProgramChange {
-                                                program: u7::new(program),
-                                            },
-                                        );
+                                nuon::label()
+                                    .y(y + 2.0)
+                                    .x(8.0)
+                                    .size(item_w - 16.0, header_h - 4.0)
+                                    .text(group_name.to_string())
+                                    .color([180, 180, 185])
+                                    .font_size(13.0)
+                                    .build(ui);
 
-                                    scene.popup.close();
+                                y += header_h;
+
+                                for (program, name) in instruments {
+                                    let is_selected = scene.current_programs[0] == *program;
+
+                                    let item_id = nuon::Id::hash_with(|h| {
+                                        use std::hash::Hash;
+                                        "instrument_item_".hash(h);
+                                        program.hash(h);
+                                    });
+
+                                    if nuon::button()
+                                        .id(item_id)
+                                        .y(y)
+                                        .size(item_w, item_h)
+                                        .label((*name).to_string())
+                                        .text_justify(nuon::TextJustify::Left)
+                                        .border_radius([4.0; 4])
+                                        .color(if is_selected {
+                                            [100, 70, 180]
+                                        } else {
+                                            [37, 35, 42]
+                                        })
+                                        .hover_color([160, 81, 255])
+                                        .preseed_color([180, 90, 255])
+                                        .build(ui)
+                                    {
+                                        scene.current_programs[0] = *program;
+                                        ctx.output_manager
+                                            .connection()
+                                            .midi_event(
+                                                u4::new(0),
+                                                MidiMessage::ProgramChange {
+                                                    program: u7::new(*program),
+                                                },
+                                            );
+                                        scene.popup.close();
+                                    }
+
+                                    y += item_h;
                                 }
                             }
                         });

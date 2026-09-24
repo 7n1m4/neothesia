@@ -2,6 +2,30 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+/// Configuration for Pocket Teto synthesis
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PocketTetoConfig {
+    /// Base MIDI note for pitch calculation (A4 = 69)
+    pub base_note: u8,
+    /// Maximum pitch shift ratio (prevents extreme values)
+    pub max_pitch_ratio: f32,
+    /// Minimum pitch shift ratio
+    pub min_pitch_ratio: f32,
+    /// Path to directory containing syllable WAV files
+    pub samples_dir: PathBuf,
+}
+
+impl Default for PocketTetoConfig {
+    fn default() -> Self {
+        Self {
+            base_note: 69, // A4
+            max_pitch_ratio: 4.0,  // 2 octaves up
+            min_pitch_ratio: 0.25, // 2 octaves down
+            samples_dir: PathBuf::from("assets/pocket_teto"),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Model {
@@ -27,10 +51,8 @@ pub struct Model {
 pub struct WaterfallConfigV1 {
     #[serde(default = "default_animation_speed")]
     pub animation_speed: f32,
-
     #[serde(default = "default_animation_offset")]
     pub animation_offset: f32,
-
     #[serde(default = "default_note_labels")]
     pub note_labels: bool,
 }
@@ -86,6 +108,7 @@ impl Default for History {
         })
     }
 }
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SynthConfigV1 {
     pub soundfont_path: Option<PathBuf>,
@@ -95,6 +118,8 @@ pub struct SynthConfigV1 {
     pub polyphony: u16,
     #[serde(default = "default_velocity_curve")]
     pub velocity_curve: VelocityCurve,
+    #[serde(default)]
+    pub pocket_teto: PocketTetoConfig,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Default, PartialEq, Eq, Debug)]
@@ -118,6 +143,7 @@ impl Default for SynthConfig {
             audio_gain: default_audio_gain(),
             polyphony: default_polyphony(),
             velocity_curve: default_velocity_curve(),
+            pocket_teto: PocketTetoConfig::default(),
         })
     }
 }
@@ -143,10 +169,8 @@ impl Default for LayoutConfig {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DevicesConfigV1 {
-    #[serde(default = "default_output")]
     pub output: Option<String>,
     pub input: Option<String>,
-
     #[serde(default = "default_separate_channels")]
     pub separate_channels: bool,
 }
@@ -168,29 +192,25 @@ impl Default for DevicesConfig {
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct ColorSchemaV1 {
+    pub name: String,
     pub base: (u8, u8, u8),
     pub dark: (u8, u8, u8),
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct AppearanceConfigV1 {
-    #[serde(default = "default_color_schema")]
-    pub color_schema: Vec<ColorSchemaV1>,
-
-    #[serde(default)]
-    pub background_color: (u8, u8, u8),
-
     #[serde(default = "default_vertical_guidelines")]
     pub vertical_guidelines: bool,
-
     #[serde(default = "default_horizontal_guidelines")]
     pub horizontal_guidelines: bool,
-
     #[serde(default = "default_glow")]
     pub glow: bool,
-
-    #[serde(default)]
+    #[serde(default = "default_chord_identifier")]
     pub chord_identifier: bool,
+    #[serde(default = "default_background_color")]
+    pub background_color: (u8, u8, u8),
+    #[serde(default = "default_color_schema")]
+    pub color_schema: Vec<ColorSchemaV1>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -201,12 +221,12 @@ pub enum AppearanceConfig {
 impl Default for AppearanceConfig {
     fn default() -> Self {
         Self::V1(AppearanceConfigV1 {
-            color_schema: default_color_schema(),
-            background_color: Default::default(),
             vertical_guidelines: default_vertical_guidelines(),
             horizontal_guidelines: default_horizontal_guidelines(),
             glow: default_glow(),
-            chord_identifier: false,
+            chord_identifier: default_chord_identifier(),
+            background_color: default_background_color(),
+            color_schema: default_color_schema(),
         })
     }
 }
@@ -274,35 +294,49 @@ fn default_glow() -> bool {
     true
 }
 
+fn default_chord_identifier() -> bool {
+    true
+}
+
 fn default_separate_channels() -> bool {
     false
+}
+
+fn default_background_color() -> (u8, u8, u8) {
+    (24, 24, 24)
 }
 
 fn default_color_schema() -> Vec<ColorSchemaV1> {
     vec![
         ColorSchemaV1 {
-            base: (210, 89, 222),
-            dark: (125, 69, 134),
+            name: "Default".into(),
+            base: (0x3c, 0x6e, 0xf0),
+            dark: (0x28, 0x4a, 0xa0),
         },
         ColorSchemaV1 {
-            base: (93, 188, 255),
-            dark: (48, 124, 255),
+            name: "Red".into(),
+            base: (0xf0, 0x3c, 0x3c),
+            dark: (0xa0, 0x28, 0x28),
         },
         ColorSchemaV1 {
-            base: (255, 126, 51),
-            dark: (192, 73, 0),
+            name: "Green".into(),
+            base: (0x3c, 0xf0, 0x6e),
+            dark: (0x28, 0xa0, 0x4a),
         },
         ColorSchemaV1 {
-            base: (51, 255, 102),
-            dark: (0, 168, 2),
+            name: "Yellow".into(),
+            base: (0xf0, 0xf0, 0x3c),
+            dark: (0xa0, 0xa0, 0x28),
         },
         ColorSchemaV1 {
-            base: (255, 51, 129),
-            dark: (48, 124, 255),
+            name: "Purple".into(),
+            base: (0xb0, 0x3c, 0xf0),
+            dark: (0x70, 0x28, 0xa0),
         },
         ColorSchemaV1 {
-            base: (210, 89, 222),
-            dark: (125, 69, 134),
+            name: "Cyan".into(),
+            base: (0x3c, 0xf0, 0xb0),
+            dark: (0x28, 0xa0, 0x70),
         },
     ]
 }

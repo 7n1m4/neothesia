@@ -1,3 +1,4 @@
+mod pocket_teto_engine;
 mod midi_backend;
 use midi_backend::{MidiBackend, MidiPortInfo};
 
@@ -7,6 +8,8 @@ mod synth_backend;
 #[cfg(feature = "synth")]
 use synth_backend::SynthBackend;
 
+use pocket_teto_engine::{PocketTetoBackend, PocketTetoOutputConnection};
+
 use std::{
     fmt::{self, Display, Formatter},
     path::PathBuf,
@@ -14,10 +17,13 @@ use std::{
 
 use midi_file::midly::{MidiMessage, num::u4};
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+use neothesia_core::config::PocketTetoConfig;
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum OutputDescriptor {
     #[cfg(feature = "synth")]
     Synth(Option<PathBuf>),
+    PocketTeto(PocketTetoConfig),
     MidiOut(MidiPortInfo),
     DummyOutput,
 }
@@ -38,6 +44,10 @@ impl OutputDescriptor {
     pub fn is_synth(&self) -> bool {
         matches!(self, OutputDescriptor::Synth(_))
     }
+
+    pub fn is_pocket_teto(&self) -> bool {
+        matches!(self, OutputDescriptor::PocketTeto(_))
+    }
 }
 
 impl Display for OutputDescriptor {
@@ -45,6 +55,7 @@ impl Display for OutputDescriptor {
         match self {
             #[cfg(feature = "synth")]
             OutputDescriptor::Synth(_) => write!(f, "Buildin Synth"),
+            OutputDescriptor::PocketTeto(_) => write!(f, "Pocket Teto"),
             OutputDescriptor::MidiOut(info) => write!(f, "{info}"),
             OutputDescriptor::DummyOutput => write!(f, "No Output"),
         }
@@ -56,6 +67,7 @@ pub enum OutputConnection {
     Midi(midi_backend::MidiOutputConnection),
     #[cfg(feature = "synth")]
     Synth(synth_backend::SynthOutputConnection),
+    PocketTeto(PocketTetoOutputConnection),
     DummyOutput,
 }
 
@@ -65,6 +77,7 @@ impl OutputConnection {
             OutputConnection::Midi(b) => b.midi_event(channel, msg),
             #[cfg(feature = "synth")]
             OutputConnection::Synth(b) => b.midi_event(channel, msg),
+            OutputConnection::PocketTeto(b) => b.midi_event(channel.into(), msg),
             OutputConnection::DummyOutput => {}
         }
     }
@@ -72,6 +85,7 @@ impl OutputConnection {
         match self {
             #[cfg(feature = "synth")]
             OutputConnection::Synth(b) => b.set_gain(gain),
+            OutputConnection::PocketTeto(b) => b.set_gain(gain),
             _ => {}
         }
     }
@@ -80,6 +94,7 @@ impl OutputConnection {
             OutputConnection::Midi(b) => b.stop_all(),
             #[cfg(feature = "synth")]
             OutputConnection::Synth(b) => b.stop_all(),
+            OutputConnection::PocketTeto(b) => b.stop_all(),
             OutputConnection::DummyOutput => {}
         }
     }
@@ -89,6 +104,7 @@ pub struct OutputManager {
     #[cfg(feature = "synth")]
     synth_backend: Option<SynthBackend>,
     midi_backend: Option<MidiBackend>,
+    pocket_teto_backend: Option<PocketTetoBackend>,
 
     output_connection: (OutputDescriptor, OutputConnection),
 }
@@ -118,10 +134,19 @@ impl OutputManager {
             }
         };
 
+        let pocket_teto_backend = match PocketTetoBackend::new() {
+            Ok(backend) => Some(backend),
+            Err(e) => {
+                log::error!("Failed to initialize Pocket Teto: {e}");
+                None
+            }
+        };
+
         Self {
             #[cfg(feature = "synth")]
             synth_backend,
             midi_backend,
+            pocket_teto_backend,
 
             output_connection: (OutputDescriptor::DummyOutput, OutputConnection::DummyOutput),
         }
@@ -137,6 +162,9 @@ impl OutputManager {
         if let Some(midi) = &self.midi_backend {
             outs.append(&mut midi.get_outputs());
         }
+        if let Some(pocket_teto) = &self.pocket_teto_backend {
+            outs.append(&mut pocket_teto.get_outputs());
+        }
 
         outs.push(OutputDescriptor::DummyOutput);
 
@@ -145,32 +173,41 @@ impl OutputManager {
 
     pub fn connect(&mut self, desc: OutputDescriptor) {
         if desc != self.output_connection.0 {
+            let desc_for_connection = desc.clone();
             match desc {
                 #[cfg(feature = "synth")]
                 OutputDescriptor::Synth(ref font) => {
-                    if let Some(ref mut synth) = self.synth_backend {
+                    if let Some(synth) = &mut self.synth_backend {
                         if let Some(font) = font.clone() {
                             self.output_connection = (
-                                desc,
+                                desc_for_connection.clone(),
                                 OutputConnection::Synth(synth.new_output_connection(&font)),
                             );
                         } else if let Some(path) = crate::utils::resources::default_sf2()
                             && path.exists()
                         {
                             self.output_connection = (
-                                desc,
+                                desc_for_connection.clone(),
                                 OutputConnection::Synth(synth.new_output_connection(&path)),
                             );
                         }
                     }
                 }
+                OutputDescriptor::PocketTeto(config) => {
+                    if let Some(pocket_teto) = &mut self.pocket_teto_backend {
+                        self.output_connection = (
+                            desc_for_connection.clone(),
+                            OutputConnection::PocketTeto(pocket_teto.new_output_connection(config.clone())),
+                        );
+                    }
+                }
                 OutputDescriptor::MidiOut(ref info) => {
                     if let Some(conn) = MidiBackend::new_output_connection(info) {
-                        self.output_connection = (desc, OutputConnection::Midi(conn));
+                        self.output_connection = (desc_for_connection.clone(), OutputConnection::Midi(conn));
                     }
                 }
                 OutputDescriptor::DummyOutput => {
-                    self.output_connection = (desc, OutputConnection::DummyOutput);
+                    self.output_connection = (desc_for_connection, OutputConnection::DummyOutput);
                 }
             }
         }

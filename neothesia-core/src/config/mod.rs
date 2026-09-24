@@ -3,6 +3,7 @@ use std::path::PathBuf;
 mod model;
 
 pub use model::ColorSchemaV1;
+pub use model::PocketTetoConfig;
 pub use model::VelocityCurve;
 use model::{
     AppearanceConfig, AppearanceConfigV1, DevicesConfig, DevicesConfigV1, History, HistoryV1,
@@ -247,6 +248,30 @@ impl Config {
             VelocityCurve::Convex => "Convex",
             VelocityCurve::Fixed => "Fixed",
         }
+    }
+
+    pub fn pocket_teto_config(&self) -> &crate::config::model::PocketTetoConfig {
+        &self.synth.pocket_teto
+    }
+
+    pub fn pocket_teto_config_mut(&mut self) -> &mut crate::config::model::PocketTetoConfig {
+        &mut self.synth.pocket_teto
+    }
+
+    pub fn set_pocket_teto_samples_dir(&mut self, path: std::path::PathBuf) {
+        self.synth.pocket_teto.samples_dir = path;
+    }
+
+    pub fn set_pocket_teto_base_note(&mut self, note: u8) {
+        self.synth.pocket_teto.base_note = note;
+    }
+
+    pub fn set_pocket_teto_max_pitch(&mut self, ratio: f32) {
+        self.synth.pocket_teto.max_pitch_ratio = ratio.max(0.01);
+    }
+
+    pub fn set_pocket_teto_min_pitch(&mut self, ratio: f32) {
+        self.synth.pocket_teto.min_pitch_ratio = ratio.max(0.01);
     }
 
     pub fn animation_offset(&self) -> f32 {
