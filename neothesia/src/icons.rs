@@ -59,3 +59,7 @@ pub fn record_stop_icon() -> &'static str {
 pub fn save_icon() -> &'static str {
     "\u{f7D9}"
 }
+
+pub fn music_icon() -> &'static str {
+    "\u{F4A0}"
+}

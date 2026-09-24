@@ -8,14 +8,16 @@ use std::{
 use midi_file::midly::{
     Format, Header, MetaMessage, MidiMessage, Smf, Timing, TrackEvent, TrackEventKind,
 };
+use midi_file::midly::num::{u4, u7};
 use neothesia_core::render::{NoteLabels, WaterfallRenderer};
+use std::hash::Hash;
 
 use crate::{
     NeothesiaEvent,
     context::Context,
     icons,
     scene::{
-        freeplay::{FreeplayScene, on_async},
+        freeplay::{FreeplayScene, FreeplayPopup, on_async},
         playing_scene::{Keyboard, midi_player::MidiPlayer},
     },
     song::Song,
@@ -303,6 +305,7 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
         GoBack,
         Record,
         Save,
+        OpenInstrumentSelector,
         None,
     }
 
@@ -400,6 +403,128 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
             {
                 msg = Msg::Record;
             }
+
+            nuon::translate().x(-30.0).add_to_current(ui);
+
+            if nuon::button()
+                .size(30.0, 30.0)
+                .border_radius([5.0; 4])
+                .icon(icons::music_icon())
+                .build(ui)
+            {
+                msg = Msg::OpenInstrumentSelector;
+            }
+
+            if scene.popup == FreeplayPopup::InstrumentSelector {
+                nuon::layer().overlay(true).build(ui, |ui| {
+                    nuon::translate()
+                        .x(-150.0)
+                        .y(35.0)
+                        .add_to_current(ui);
+
+                    let instruments: Vec<String> = midi_file::INSTRUMENT_NAMES
+                        .iter()
+                        .map(|&name| name.to_string())
+                        .collect();
+
+                    let item_h = 30.0;
+                    let item_w = 200.0;
+                    let max_visible = 12;
+                    let visible_h = item_h * max_visible.min(instruments.len()) as f32;
+                    let full_h = item_h * instruments.len() as f32;
+
+                    // Initialize scroll state if needed
+                    if matches!(scene.instrument_selector_scroll, nuon::ScrollState::Uninitialized) {
+                        scene.instrument_selector_scroll = nuon::ScrollState::Ready {
+                            value: 0.0,
+                            max: 0.0,
+                            mouse_drag_offset: 0.0,
+                        };
+                    }
+
+                    let mut scroll_state = scene.instrument_selector_scroll;
+
+                    // Background
+                    nuon::quad()
+                        .width(item_w)
+                        .height(visible_h)
+                        .color([27, 25, 32])
+                        .build(ui);
+
+                    // Scrollable layer
+                    nuon::layer().scissor_rect(nuon::Rect {
+                        origin: nuon::Point::zero(),
+                        size: nuon::Size::new(item_w, visible_h),
+                    }).build(ui, |ui| {
+                        // Get scroll value - use match to access private field
+                        let scroll = match scroll_state {
+                            nuon::ScrollState::Ready { value, .. } => value,
+                            _ => 0.0,
+                        };
+                        nuon::translate().y(-scroll).build(ui, |ui| {
+                            for (nth, instrument) in instruments.iter().enumerate() {
+                                let item_id = nuon::Id::hash_with(|h| {
+                                    use std::hash::Hash;
+                                    "instrument_selector_".hash(h);
+                                    nth.hash(h);
+                                });
+
+                                if nuon::button()
+                                    .id(item_id)
+                                    .y(item_h * nth as f32)
+                                    .size(item_w, item_h)
+                                    .label(instrument.clone())
+                                    .text_justify(nuon::TextJustify::Left)
+                                    .border_radius([5.0; 4])
+                                    .hover_color([160, 81, 255])
+                                    .preseed_color([180, 90, 255])
+                                    .build(ui)
+                                {
+                                    let program = nth as u8;
+                                    scene.current_programs[0] = program;
+
+                                    // Send program change to output
+                                    ctx.output_manager
+                                        .connection()
+                                        .midi_event(
+                                            u4::new(0),
+                                            MidiMessage::ProgramChange {
+                                                program: u7::new(program),
+                                            },
+                                        );
+
+                                    scene.popup.close();
+                                }
+                            }
+                        });
+
+                        let max_scroll = (full_h - visible_h).max(0.0);
+                        // Update max
+                        match &mut scroll_state {
+                            nuon::ScrollState::Ready { max, .. } => *max = max_scroll,
+                            _ => {}
+                        }
+
+                        // Handle scroll area for wheel events
+                        let scroll_area = nuon::scroll_area()
+                            .rect(nuon::Rect {
+                                origin: nuon::Point::zero(),
+                                size: nuon::Size::new(item_w, visible_h),
+                            })
+                            .build(ui);
+                        // Update scroll state
+                        let delta = -scroll_area;
+                        match &mut scroll_state {
+                            nuon::ScrollState::Ready { value, max, .. } => {
+                                *value = (*value + delta).clamp(0.0, *max);
+                            }
+                            _ => {}
+                        }
+                    });
+
+                    scene.instrument_selector_scroll = scroll_state;
+                });
+            }
         });
 
         if let Some(state) = scene.preview.as_ref() {
@@ -464,6 +589,9 @@ pub fn update_preview_ui(scene: &mut FreeplayScene, ctx: &mut Context) {
         }
         Msg::Save => {
             handle_save_click(scene, ctx);
+        }
+        Msg::OpenInstrumentSelector => {
+            scene.popup.toggle(FreeplayPopup::InstrumentSelector);
         }
         Msg::None => {}
     }

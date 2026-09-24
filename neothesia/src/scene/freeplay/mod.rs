@@ -59,6 +59,30 @@ pub struct FreeplayScene {
 
     context: std::task::Context<'static>,
     futures: Vec<BoxFuture<MsgFn>>,
+
+    // Current instrument program per channel (0-15)
+    current_programs: [u8; 16],
+
+    // UI state
+    popup: FreeplayPopup,
+    instrument_selector_scroll: nuon::ScrollState,
+}
+
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum FreeplayPopup {
+    #[default]
+    None,
+    InstrumentSelector,
+}
+
+impl FreeplayPopup {
+    pub fn toggle(&mut self, new: Self) {
+        *self = if *self == new { Self::None } else { new };
+    }
+
+    pub fn close(&mut self) {
+        *self = Self::None;
+    }
 }
 
 impl FreeplayScene {
@@ -105,6 +129,11 @@ impl FreeplayScene {
 
             context: std::task::Context::from_waker(noop_waker_ref()),
             futures: Vec::new(),
+
+            current_programs: [0; 16],
+
+            popup: FreeplayPopup::default(),
+            instrument_selector_scroll: nuon::ScrollState::default(),
         }
     }
 
@@ -262,6 +291,13 @@ impl Scene for FreeplayScene {
         ctx.output_manager
             .connection()
             .midi_event(channel.into(), *message);
+
+        // Track program changes for instrument display
+        if let MidiMessage::ProgramChange { program } = message {
+            if (channel as usize) < self.current_programs.len() {
+                self.current_programs[channel as usize] = program.as_int();
+            }
+        }
 
         if let MidiMessage::NoteOn { .. } = message {
             let start = self.keyboard.layout().range.start();
